@@ -18,6 +18,125 @@ function initPaypalCheckout() {
         var errorShown = false;
 
         paypal_checkout_sdk.Buttons({
+            style: {
+                layout:  'horizontal',
+                color:   'white',
+                shape:   'rect',
+                tagline: 'false',
+                label:   'paypal'
+            },
+
+            // https://developer.paypal.com/docs/checkout/integration-features/shipping-callback)
+            onShippingChange: function(data, actions) {
+                // Reject non-US addresses
+                if ((data.shipping_address.country_code !== 'US') && (data.shipping_address.country_code !== 'CA')) {
+                    console.error("non-US/CA? rejecting!");
+                    return actions.reject();
+                }
+
+                var csrfToken = $("[name=CRAFT_CSRF_TOKEN]").prop("value"),
+                    path = "/" + window.location.pathname.split("/").filter(i => !!i).join("/"),
+                    statesByAbbr = {"AB":"9","BC":"10","MB":"11","NB":"12","NL":"13","NT":"14","NS":"15","NU":"16","ON":"17","PE":"18","QC":"19","SK":"20","YT":"21","AL":"22","AK":"23","AZ":"24","AR":"25","CA":"26","CO":"27","CT":"28","DE":"29","DC":"30","FL":"31","GA":"32","HI":"33","ID":"34","IL":"35","IN":"36","IA":"37","KS":"38","KY":"39","LA":"40","ME":"41","MD":"42","MA":"43","MI":"44","MN":"45","MS":"46","MO":"47","MT":"48","NE":"49","NV":"50","NH":"51","NJ":"52","NM":"53","NY":"54","NC":"55","ND":"56","OH":"57","OK":"58","OR":"59","PA":"60","RI":"61","SC":"62","SD":"63","TN":"64","TX":"65","UT":"66","VT":"67","VA":"68","WA":"69","WV":"70","WI":"71","WY":"72"},
+                    countryByAbbr = {"US":"233","CA":"38"};
+
+                return $.ajax({
+                    type: 'POST',
+                    url: path,
+                    data: {
+                        action: 'commerce/cart/update-cart',
+                        CRAFT_CSRF_TOKEN: csrfToken,
+                        shippingAddress: {
+                            city: data.shipping_address.city,
+                            stateValue: statesByAbbr[data.shipping_address.state.toUpperCase()],
+                            countryId: countryByAbbr[data.shipping_address.country_code.toUpperCase()],
+                            zipCode: data.shipping_address.postal_code
+                        }
+                    },
+                    dataType: 'json'
+                }).then(function(response) {
+                    if (!response.cart.shippingAddressId) {
+                        console.error('error updating address!');
+                        return actions.reject();
+                    }
+
+                    // Patch the shipping amount
+                    data.amount.value = parseFloat(response.cart.totalPrice).toFixed(2);
+                    data.amount.breakdown.item_total.value = parseFloat(response.cart.totalTaxablePrice).toFixed(2);
+                    data.amount.breakdown.tax_total.value = parseFloat(response.cart.totalTax).toFixed(2);
+
+                    return actions.order.patch([
+                        {
+                            op: 'replace',
+                            path: '/purchase_units/@reference_id==\'default\'/amount',
+                            value: data.amount
+                        }
+                    ]);
+                }).catch(function(error) {
+                    console.error('error updating cart! ' + JSON.stringify(error));
+                    return actions.reject();
+                });
+            },
+
+            onClick: function(data, actions) {
+                var csrfToken = $("[name=CRAFT_CSRF_TOKEN]").prop("value");
+                    path = "/" + window.location.pathname.split("/").filter(i => !!i).join("/");
+
+                $("#paypal-card-errors").addClass("hidden");
+
+                // Get cart from server (can't use client-side, to avoid adding multiple times)
+                return $.ajax({
+                    type: 'POST',
+                    url: path,
+                    data: {
+                        action: 'commerce/cart/get-cart',
+                        CRAFT_CSRF_TOKEN: csrfToken
+                    },
+                    dataType: 'json'
+                }).then(function(response) {
+                    if (response && response.cart && response.cart.lineItems && response.cart.lineItems.length === 0) {
+                        let product = $(".pay-button").closest(".paymentSource-form").siblings(".add-to-cart-button-container").attr("product"),
+                            deviceColor = $("input[type=radio][name=" + product + "-device-color]:checked").prop("value"),
+                            deviceSize  = $("input[type=radio][name=" + product + "-device-size]:checked").prop("value"),
+                            purchasable = $("input[name=" + product + "-varients][deviceColor=" + deviceColor + "][deviceSize=" + deviceSize + "]"),
+                            purchasableId = purchasable.attr("purchasableId");
+
+                        // update cart with the chosen item
+                        return $.ajax({
+                            type: 'POST',
+                            url: path,
+                            data: {
+                                action: 'commerce/cart/update-cart',
+                                purchasableId: purchasableId,
+                                qty: 1,
+                                CRAFT_CSRF_TOKEN: csrfToken
+                            },
+                            dataType: 'json'
+                        }).then(function(response) {
+                            // Cart updated!
+                            return actions.resolve();
+                        }).catch(function(error) {
+                            // Failed updating cart
+                            console.error('error updating cart! ' + JSON.stringify(error));
+                            $("#paypal-card-errors").removeClass("hidden");
+                            $("#paypal-card-errors").text("Error updating cart (" + error.statusText + " " + error.status + ")");
+                            return actions.reject();
+                        });
+                    } else {
+                        // Cart has items already, we can proceed
+                        return actions.resolve();
+                        // Alternative flow, to be used in the future
+                        //window.location = "/cart";
+                        //return actions.reject();
+                    }
+                }).catch(function(error) {
+                    // Error getting cart?!
+                    console.error('error getting cart! ' + JSON.stringify(error));
+                    $("#paypal-card-errors").removeClass("hidden");
+                    $("#paypal-card-errors").text("Error getting cart (" + error.statusText + " " + error.status + ")");
+                    return actions.reject();
+                });
+            },
+
             createOrder: function(data, actions) {
                 var form = new FormData($form);
 
@@ -31,10 +150,7 @@ function initPaypalCheckout() {
                     return res.json();
                 }).then(function(data) {
                     if (data.error) {
-                        var error = JSON.parse(data.error);
-                        if (error.details && error.details.length) {
-                            throw Error(error.details[0].description);
-                        }
+                        throw Error(data.error);
                     }
                     transactionHash = data.transactionHash;
                     return data.transactionId; // Use the same key name for order ID on the client and server
