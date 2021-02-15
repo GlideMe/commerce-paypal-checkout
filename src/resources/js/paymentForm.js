@@ -79,6 +79,11 @@ function initPaypalCheckout() {
             },
 
             onClick: function(data, actions) {
+                gtag('event', 'PayPal Checkout', {
+                    'event_category' : 'Commerce',
+                    'event_label' : 'Wristcam'
+                });
+
                 var csrfToken = $("[name=CRAFT_CSRF_TOKEN]").prop("value");
                     path = "/" + window.location.pathname.split("/").filter(i => !!i).join("/");
 
