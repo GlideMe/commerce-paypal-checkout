@@ -240,6 +240,7 @@ class Gateway extends BaseGateway
 
         // After authorize - update order with email/address/taxes
         $payer = $apiResponse->result->payer;
+        $order = $transaction->order;
         $order->email = $payer->email_address;
 
         $shipping = $apiResponse->result->purchase_units[0]->shipping->address;
