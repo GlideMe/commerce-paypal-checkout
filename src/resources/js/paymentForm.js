@@ -54,8 +54,9 @@ function initPaypalCheckout() {
                     },
                     dataType: 'json'
                 }).then(function(response) {
-                    if (!response.cart.shippingAddressId) {
-                        console.error('error updating address!');
+
+                    if (response.error) {
+                        console.error('error! ' + response.error + '(' + JSON.stringify(response.errors) + ')');
                         return actions.reject();
                     }
 
