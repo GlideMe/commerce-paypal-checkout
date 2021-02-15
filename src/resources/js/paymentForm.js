@@ -56,7 +56,7 @@ function initPaypalCheckout() {
                 }).then(function(response) {
 
                     if (response.error) {
-                        console.error('error! ' + response.error + '(' + JSON.stringify(response.errors) + ')');
+                        console.error('error! ' + response.error + ' (' + JSON.stringify(response.errors) + ')');
                         return actions.reject();
                     }
 
