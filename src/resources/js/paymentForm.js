@@ -94,7 +94,7 @@ function initPaypalCheckout() {
                     dataType: 'json'
                 }).then(function(response) {
                     if (response && response.cart && response.cart.lineItems && response.cart.lineItems.length === 0) {
-                        let product = $(".pay-button").closest(".paymentSource-form").siblings(".add-to-cart-button-container").attr("product"),
+                        let product = $($form).closest(".paypal-button-container").attr("product"),
                             deviceColor = $("input[type=radio][name=" + product + "-device-color]:checked").prop("value"),
                             deviceSize  = $("input[type=radio][name=" + product + "-device-size]:checked").prop("value"),
                             purchasable = $("input[name=" + product + "-varients][deviceColor=" + deviceColor + "][deviceSize=" + deviceSize + "]"),
