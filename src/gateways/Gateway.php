@@ -540,7 +540,8 @@ class Gateway extends BaseGateway
 
         $requestData['purchase_units'] = $this->_buildPurchaseUnits($order, $transaction);
 
-        $shippingPreference = isset($requestData['purchase_units'][0]['shipping']) && !empty($requestData['purchase_units'][0]['shipping']) && isset($requestData['purchase_units'][0]['shipping']['address']) ? 'SET_PROVIDED_ADDRESS' : 'GET_FROM_FILE';
+        //$shippingPreference = isset($requestData['purchase_units'][0]['shipping']) && !empty($requestData['purchase_units'][0]['shipping']) && isset($requestData['purchase_units'][0]['shipping']['address']) ? 'SET_PROVIDED_ADDRESS' : 'GET_FROM_FILE';
+        $shippingPreference = 'GET_FROM_FILE';
 
         $requestData['application_context'] = [
             'brand_name' => $this->brandName,
