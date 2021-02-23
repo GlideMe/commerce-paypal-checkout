@@ -176,8 +176,29 @@ function initPaypalCheckout() {
                 if (completeUrl.indexOf('?') >= 0) {
                     separator = '&';
                 }
+                $.ajax({
+                    type: 'GET',
+                    url: completeUrl + separator + 'commerceTransactionHash=' + transactionHash,
+                    success: function(data) {
+                        // Note: we don't actually expect to get here, we should get 302 upon success. Added here just to be on the safe side.
+                        window.location = completeUrl + separator + 'commerceTransactionHash=' + transactionHash;
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        if (jqXHR.status === 302) {
+                            window.location = jqXHR.getResponseHeader('x-redirect');
+                            return;
+                        }
 
-                window.location = completeUrl + separator + 'commerceTransactionHash=' + transactionHash;
+                        $("#paypal-card-errors").removeClass("hidden");
+                        $("#paypal-card-errors").html("Payment failed!</BR>Please try again or contact our <a href='mailto:support@wristcam.com' target='_blank'>Support</a>");
+
+                        // Show alert after the page updates with the error html
+                        setTimeout(function(){
+                            alert("Payment failed! Please try again or contact our support.");
+                        }, 200);
+                    }
+                });
+
             }
         }).render('#paypal-button-container');
     }
