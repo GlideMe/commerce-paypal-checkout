@@ -239,43 +239,49 @@ class Gateway extends BaseGateway
         }
 
         // After authorize - update order with email/address/taxes
-        $payer = $apiResponse->result->payer;
-        $order = $transaction->order;
-        $order->email = $payer->email_address;
+        try {
+            $order = $transaction->order;
+            $payer = $apiResponse->result->payer;
+            $order->email = $payer->email_address;
 
-        $shipping = $apiResponse->result->purchase_units[0]->shipping->address;
+            $shipping = $apiResponse->result->purchase_units[0]->shipping->address;
 
-        $countryObj = Plugin::getInstance()->getCountries()->getCountryByIso($shipping->country_code);
-        $stateObj = Plugin::getInstance()->getStates()->getStateByAbbreviation($countryObj->id, $shipping->admin_area_1);
-        $address = new Address();
-        $address->firstName = $payer->name->given_name;
-        $address->lastName = $payer->name->surname;
-        $address->phone = $payer->phone->phone_number->national_number;
-        $address->address1 = $shipping->address_line_1;
-        $address->address2 = $shipping->address_line_2 ?? "";
-        $address->city = $shipping->admin_area_2;
-        $address->zipCode = $shipping->postal_code;
-        $address->stateId = $stateObj->id;
-        $address->countryId = $countryObj->id;
+            $countryObj = Plugin::getInstance()->getCountries()->getCountryByIso($shipping->country_code);
+            $stateObj = Plugin::getInstance()->getStates()->getStateByAbbreviation($countryObj->id, $shipping->admin_area_1);
 
-        $order->setShippingAddress($address);
-        $order->setBillingAddress($address);
+            $address = new Address();
+            $address->firstName = $payer->name->given_name;
+            $address->lastName = $payer->name->surname;
+            $address->phone = $payer->phone->phone_number->national_number;
+            $address->address1 = $shipping->address_line_1;
+            $address->address2 = $shipping->address_line_2 ?? "";
+            $address->city = $shipping->admin_area_2;
+            $address->zipCode = $shipping->postal_code;
+            $address->stateId = $stateObj->id;
+            $address->countryId = $countryObj->id;
 
-        // Recalculate to get the relevant tax
-        $order->setRecalculationMode(Order::RECALCULATION_MODE_ADJUSTMENTS_ONLY);
-        $order->recalculate();
-        $order->setRecalculationMode(Order::RECALCULATION_MODE_NONE);
+            $order->setShippingAddress($address);
+            $order->setBillingAddress($address);
 
-        $successSaving = Craft::$app->getElements()->saveElement($order, true);
+            // Recalculate to get the relevant tax
+            $order->setRecalculationMode(Order::RECALCULATION_MODE_ADJUSTMENTS_ONLY);
+            $order->recalculate();
+            $order->setRecalculationMode(Order::RECALCULATION_MODE_NONE);
 
-        if ($successSaving) {
-            // Make sure our transaction is updated to include tax
-            $paymentCurrency = Plugin::getInstance()->getPaymentCurrencies()->getPaymentCurrencyByIso($order->paymentCurrency);
-            $transaction->amount = $order->getTotalPrice();
-            $transaction->paymentAmount = Currency::round($order->getTotalPrice() * $paymentCurrency->rate, $paymentCurrency);
-        } else {
-            Craft::error('FAILED VALIDATING ORDER! ' . json_encode($order->getErrors()));
-            throw new PaymentException('Failed saving authorized order!');
+            $successSaving = Craft::$app->getElements()->saveElement($order, true);
+
+            if ($successSaving) {
+                // Make sure our transaction is updated to include tax
+                $paymentCurrency = Plugin::getInstance()->getPaymentCurrencies()->getPaymentCurrencyByIso($order->paymentCurrency);
+                $transaction->amount = $order->getTotalPrice();
+                $transaction->paymentAmount = Currency::round($order->getTotalPrice() * $paymentCurrency->rate, $paymentCurrency);
+            } else {
+                Craft::error('FAILED VALIDATING ORDER! ' . json_encode($order->getErrors()));
+                throw new PaymentException('Failed saving authorized order!');
+            }
+        } catch (\Exception $e) {
+            Craft::error('FAILED UPDATING ORDER AFTER AUTHORIZED! ' . json_encode($order->getErrors()));
+            throw new PaymentException($e->getMessage());
         }
 
         return $this->getResponseModel($apiResponse);
@@ -540,7 +546,8 @@ class Gateway extends BaseGateway
 
         $requestData['purchase_units'] = $this->_buildPurchaseUnits($order, $transaction);
 
-        $shippingPreference = isset($requestData['purchase_units'][0]['shipping']) && !empty($requestData['purchase_units'][0]['shipping']) && isset($requestData['purchase_units'][0]['shipping']['address']) ? 'SET_PROVIDED_ADDRESS' : 'GET_FROM_FILE';
+        //$shippingPreference = isset($requestData['purchase_units'][0]['shipping']) && !empty($requestData['purchase_units'][0]['shipping']) && isset($requestData['purchase_units'][0]['shipping']['address']) ? 'SET_PROVIDED_ADDRESS' : 'GET_FROM_FILE';
+        $shippingPreference = 'GET_FROM_FILE';
 
         $requestData['application_context'] = [
             'brand_name' => $this->brandName,

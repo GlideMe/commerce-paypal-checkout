@@ -61,15 +61,24 @@ function initPaypalCheckout() {
                     }
 
                     // Patch the shipping amount
-                    data.amount.value = parseFloat(response.cart.totalPrice).toFixed(2);
-                    data.amount.breakdown.item_total.value = parseFloat(response.cart.totalTaxablePrice).toFixed(2);
-                    data.amount.breakdown.tax_total.value = parseFloat(response.cart.totalTax).toFixed(2);
-
                     return actions.order.patch([
                         {
                             op: 'replace',
                             path: '/purchase_units/@reference_id==\'default\'/amount',
-                            value: data.amount
+                            value: {
+                                currency_code: 'USD',
+                                value: parseFloat(response.cart.totalPrice).toFixed(2),
+                                breakdown: {
+                                    item_total: {
+                                        currency_code: 'USD',
+                                        value: parseFloat(response.cart.totalTaxablePrice).toFixed(2)
+                                    },
+                                    tax_total: {
+                                        currency_code: 'USD',
+                                        value: parseFloat(response.cart.totalTax).toFixed(2)
+                                    }
+                                }
+                            }
                         }
                     ]);
                 }).catch(function(error) {
@@ -99,46 +108,73 @@ function initPaypalCheckout() {
                     },
                     dataType: 'json'
                 }).then(function(response) {
-                    if (response && response.cart && response.cart.lineItems && response.cart.lineItems.length === 0) {
+                    if (response && response.cart && response.cart.lineItems) {
                         let product = $($form).closest(".paypal-button-container").attr("product"),
                             deviceColor = $("input[type=radio][name=" + product + "-device-color]:checked").prop("value"),
                             deviceSize  = $("input[type=radio][name=" + product + "-device-size]:checked").prop("value"),
                             purchasable = $("input[name=" + product + "-varients][deviceColor=" + deviceColor + "][deviceSize=" + deviceSize + "]"),
                             purchasableId = purchasable.attr("purchasableId");
 
-                        // update cart with the chosen item
-                        return $.ajax({
-                            type: 'POST',
-                            url: path,
-                            data: {
-                                action: 'commerce/cart/update-cart',
-                                purchasableId: purchasableId,
-                                qty: 1,
-                                CRAFT_CSRF_TOKEN: csrfToken
-                            },
-                            dataType: 'json'
-                        }).then(function(response) {
-                            // Cart updated!
-                            return actions.resolve();
-                        }).catch(function(error) {
-                            // Failed updating cart
-                            console.error('error updating cart! ' + JSON.stringify(error));
-                            $("#paypal-card-errors").removeClass("hidden");
-                            $("#paypal-card-errors").text("Error updating cart (" + error.statusText + " " + error.status + ")");
+                        function updateCartSingleItem() {
+                            let reqParams = {
+                                type: 'POST',
+                                url: path,
+                                data: {
+                                    action: 'commerce/cart/update-cart',
+                                    purchasableId: purchasableId,
+                                    qty: 1,
+                                    CRAFT_CSRF_TOKEN: csrfToken
+                                },
+                                dataType: 'json'
+                            };
+                            // If we got here and there's already an item - we need to remove it first
+                            if (response.cart.lineItems.length === 1) {
+                                reqParams.data["lineItems[" + response.cart.lineItems[0].id + "][remove]"] = 1;
+                            }
+                            return $.ajax(reqParams).then(function(response) {
+                                // Cart updated!
+                                return actions.resolve();
+                            }).catch(function(error) {
+                                // Failed updating cart
+                                console.error('error updating cart! ' + JSON.stringify(error));
+                                $("#paypal-card-errors").removeClass("hidden");
+                                $("#paypal-card-errors").text("Error updating cart (" + error.statusText + " " + error.status + ")");
+                                return actions.reject();
+                            });
+                        }
+
+                        // Logic
+                        // If no line items, add selected item to cart
+                        // If single line item, qty 1 and different than button, replace it
+                        // If single line item, qty 1 and same as button, no need to update
+                        // otherwise, go to cart page
+                        if (response.cart.lineItems.length === 0) {
+                            // set selected item to cart
+                            return updateCartSingleItem();
+                        } else if (response.cart.lineItems.length === 1 && response.cart.lineItems[0].qty === 1) {
+                            if (response.cart.lineItems[0].purchasableId === purchasableId) {
+                                // Cart has selected item already, we can proceed
+                                return actions.resolve();
+                            } else {
+                                // Replace single item in cart with the different item chosen in the UI
+                                return updateCartSingleItem();
+                            }
+                        } else {
+                            window.location = "/cart";
                             return actions.reject();
-                        });
+                        }
                     } else {
-                        // Cart has items already, we can proceed
-                        return actions.resolve();
-                        // Alternative flow, to be used in the future
-                        //window.location = "/cart";
-                        //return actions.reject();
+                        // Error getting cart?!
+                        console.error('error getting cart! ' + JSON.stringify(response));
+                        $("#paypal-card-errors").removeClass("hidden");
+                        $("#paypal-card-errors").text("Failed to get cart (" + response + ")");
+                        return actions.reject();
                     }
                 }).catch(function(error) {
                     // Error getting cart?!
                     console.error('error getting cart! ' + JSON.stringify(error));
                     $("#paypal-card-errors").removeClass("hidden");
-                    $("#paypal-card-errors").text("Error getting cart (" + error.statusText + " " + error.status + ")");
+                    $("#paypal-card-errors").text("Failed to get cart (" + error.statusText + " " + error.status + ")");
                     return actions.reject();
                 });
             },
