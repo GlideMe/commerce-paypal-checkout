@@ -60,25 +60,38 @@ function initPaypalCheckout() {
                         return actions.reject();
                     }
 
+                    let amount = {
+                            currency_code: response.cart.paymentCurrency,
+                            value: parseFloat(response.cart.totalPrice).toFixed(2),
+                            breakdown: {
+                                item_total: {
+                                    currency_code: response.cart.paymentCurrency,
+                                    value: parseFloat(response.cart.itemSubtotal).toFixed(2)
+                                },
+                                shipping: {
+                                    currency_code: response.cart.paymentCurrency,
+                                    value: parseFloat(response.cart.totalShippingCost).toFixed(2)
+                                },
+                                tax_total: {
+                                    currency_code: response.cart.paymentCurrency,
+                                    value: parseFloat(response.cart.totalTax).toFixed(2)
+                                }
+                            }
+                        };
+
+                    if (response.cart.totalDiscount !== 0) {
+                        amount.breakdown.discount = {
+                            currency_code: response.cart.paymentCurrency,
+                            value: parseFloat(response.cart.totalDiscount * -1).toFixed(2)
+                        };
+                    }
+
                     // Patch the shipping amount
                     return actions.order.patch([
                         {
                             op: 'replace',
                             path: '/purchase_units/@reference_id==\'default\'/amount',
-                            value: {
-                                currency_code: 'USD',
-                                value: parseFloat(response.cart.totalPrice).toFixed(2),
-                                breakdown: {
-                                    item_total: {
-                                        currency_code: 'USD',
-                                        value: parseFloat(response.cart.totalTaxablePrice).toFixed(2)
-                                    },
-                                    tax_total: {
-                                        currency_code: 'USD',
-                                        value: parseFloat(response.cart.totalTax).toFixed(2)
-                                    }
-                                }
-                            }
+                            value: amount
                         }
                     ]);
                 }).catch(function(error) {
@@ -100,11 +113,10 @@ function initPaypalCheckout() {
 
                 // Get cart from server (can't use client-side, to avoid adding multiple times)
                 return $.ajax({
-                    type: 'POST',
+                    type: 'GET',
                     url: path,
                     data: {
-                        action: 'commerce/cart/get-cart',
-                        CRAFT_CSRF_TOKEN: csrfToken
+                        action: 'commerce/cart/get-cart'
                     },
                     dataType: 'json'
                 }).then(function(response) {
