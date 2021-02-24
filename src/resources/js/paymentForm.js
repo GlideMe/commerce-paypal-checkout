@@ -16,14 +16,16 @@ function initPaypalCheckout() {
         var completeUrl = $wrapper.dataset.complete;
         var transactionHash;
         var errorShown = false;
+        var screenWidth = $(window).width();
 
         paypal_checkout_sdk.Buttons({
             style: {
                 layout:  'horizontal',
                 color:   'white',
-                shape:   'rect',
+                shape:   screenWidth > 767 ? 'pill' : 'rect',
                 tagline: 'false',
-                label:   'paypal'
+                label:   'paypal',
+                size: 'responsive'
             },
 
             // https://developer.paypal.com/docs/checkout/integration-features/shipping-callback)
