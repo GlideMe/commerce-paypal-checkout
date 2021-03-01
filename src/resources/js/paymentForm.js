@@ -229,10 +229,10 @@ function initPaypalCheckout() {
                     type: 'GET',
                     url: completeUrl + separator + 'commerceTransactionHash=' + transactionHash,
                     beforeSend: function() {
-                        $(".modal-overlay").show();
+                        $(".pending-payment-modal-overlay").show();
                     },
                     complete: function() {
-                        $(".modal-overlay").hide();
+                        $(".pending-payment-modal-overlay").hide();
                     },
                     success: function(data) {
                         // Note: we don't actually expect to get here, we should get 302 upon success. Added here just to be on the safe side.
