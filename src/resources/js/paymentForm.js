@@ -107,7 +107,6 @@ function initPaypalCheckout() {
                     'event_category' : 'Commerce',
                     'event_label' : 'Wristcam'
                 });
-
                 var csrfToken = $("[name=CRAFT_CSRF_TOKEN]").prop("value");
                     path = "/" + window.location.pathname.split("/").filter(i => !!i).join("/");
 
@@ -229,6 +228,12 @@ function initPaypalCheckout() {
                 $.ajax({
                     type: 'GET',
                     url: completeUrl + separator + 'commerceTransactionHash=' + transactionHash,
+                    beforeSend: function() {
+                        $(".modal-overlay").show();
+                    },
+                    complete: function() {
+                        $(".modal-overlay").hide();
+                    },
                     success: function(data) {
                         // Note: we don't actually expect to get here, we should get 302 upon success. Added here just to be on the safe side.
                         window.location = completeUrl + separator + 'commerceTransactionHash=' + transactionHash;
