@@ -157,11 +157,14 @@ function initPaypalCheckout() {
                         }
 
                         // Logic
+                        // If in cart page action with non empty cart
                         // If no line items, add selected item to cart
                         // If single line item, qty 1 and different than button, replace it
                         // If single line item, qty 1 and same as button, no need to update
                         // otherwise, go to cart page
-                        if (response.cart.lineItems.length === 0) {
+                        if(window.location.pathname.startsWith('/cart') && response.cart.totalQty > 0) {
+                            return actions.resolve();
+                        } else if (response.cart.lineItems.length === 0) {
                             // set selected item to cart
                             return updateCartSingleItem();
                         } else if (response.cart.lineItems.length === 1 && response.cart.lineItems[0].qty === 1) {
@@ -176,6 +179,8 @@ function initPaypalCheckout() {
                             window.location = "/cart";
                             return actions.reject();
                         }
+
+
                     } else {
                         // Error getting cart?!
                         console.error('error getting cart! ' + JSON.stringify(response));
