@@ -157,13 +157,20 @@ function initPaypalCheckout() {
                         }
 
                         // Logic
-                        // If in cart page action with non empty cart
+                        // If in cart page action
                         // If no line items, add selected item to cart
                         // If single line item, qty 1 and different than button, replace it
                         // If single line item, qty 1 and same as button, no need to update
                         // otherwise, go to cart page
-                        if(window.location.pathname.startsWith('/cart') && response.cart.totalQty > 0) {
-                            return actions.resolve();
+                        if(window.location.pathname.startsWith('/cart')) {
+                            //If not empty cart - resolve
+                            //otherwise - reject
+                            if(response.cart.totalQty > 0) {
+                                return actions.resolve();
+                            }
+                            else {
+                                return actions.reject();
+                            }
                         } else if (response.cart.lineItems.length === 0) {
                             // set selected item to cart
                             return updateCartSingleItem();
