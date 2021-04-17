@@ -169,6 +169,8 @@ function initPaypalCheckout() {
                                 return actions.resolve();
                             }
                             else {
+                                $("#paypal-card-errors").removeClass("hidden");
+                                $("#paypal-card-errors").text("Your cart is empty. Please add a product before purchasing.");
                                 return actions.reject();
                             }
                         } else if (response.cart.lineItems.length === 0) {
