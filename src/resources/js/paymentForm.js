@@ -103,10 +103,12 @@ function initPaypalCheckout() {
             },
 
             onClick: function(data, actions) {
-                gtag('event', 'PayPal Checkout', {
-                    'event_category' : 'Commerce',
-                    'event_label' : 'Wristcam'
+                dataLayer.push({
+                  'event': 'PayPal Checkout',
+                  'event_category' : 'Commerce',
+                  'event_label' : 'Wristcam'
                 });
+
                 var csrfToken = $("[name=CRAFT_CSRF_TOKEN]").prop("value");
                     path = "/" + window.location.pathname.split("/").filter(i => !!i).join("/");
 
@@ -157,11 +159,23 @@ function initPaypalCheckout() {
                         }
 
                         // Logic
+                        // If in cart page action
                         // If no line items, add selected item to cart
                         // If single line item, qty 1 and different than button, replace it
                         // If single line item, qty 1 and same as button, no need to update
                         // otherwise, go to cart page
-                        if (response.cart.lineItems.length === 0) {
+                        if(window.location.pathname.startsWith('/cart')) {
+                            //If not empty cart - resolve
+                            //otherwise - reject
+                            if(response.cart.totalQty > 0) {
+                                return actions.resolve();
+                            }
+                            else {
+                                $("#paypal-card-errors").removeClass("hidden");
+                                $("#paypal-card-errors").text("Your cart is empty. Please add a product before purchasing.");
+                                return actions.reject();
+                            }
+                        } else if (response.cart.lineItems.length === 0) {
                             // set selected item to cart
                             return updateCartSingleItem();
                         } else if (response.cart.lineItems.length === 1 && response.cart.lineItems[0].qty === 1) {
@@ -176,6 +190,8 @@ function initPaypalCheckout() {
                             window.location = "/cart";
                             return actions.reject();
                         }
+
+
                     } else {
                         // Error getting cart?!
                         console.error('error getting cart! ' + JSON.stringify(response));
