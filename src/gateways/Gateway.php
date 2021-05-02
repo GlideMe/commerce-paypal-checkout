@@ -30,6 +30,7 @@ use craft\web\View;
 use PayPalCheckoutSdk\Core\PayPalHttpClient;
 use PayPalCheckoutSdk\Core\SandboxEnvironment;
 use PayPalCheckoutSdk\Core\ProductionEnvironment;
+use PayPalCheckoutSdk\Orders\OrdersGetRequest;
 use PayPalCheckoutSdk\Orders\OrdersAuthorizeRequest;
 use PayPalCheckoutSdk\Orders\OrdersCaptureRequest;
 use PayPalCheckoutSdk\Payments\AuthorizationsCaptureRequest;
@@ -227,11 +228,9 @@ class Gateway extends BaseGateway
      */
     public function completeAuthorize(Transaction $transaction): RequestResponseInterface
     {
-        $request = new OrdersAuthorizeRequest($transaction->reference);
+        $request = new OrdersGetRequest($transaction->reference);
         $request->body = '{}';
-        $request->prefer('return=representation');
         $client = $this->createClient();
-
         try {
             $apiResponse = $client->execute($request);
         } catch (\Exception $e) {
@@ -275,6 +274,17 @@ class Gateway extends BaseGateway
                 $paymentCurrency = Plugin::getInstance()->getPaymentCurrencies()->getPaymentCurrencyByIso($order->paymentCurrency);
                 $transaction->amount = $order->getTotalPrice();
                 $transaction->paymentAmount = Currency::round($order->getTotalPrice() * $paymentCurrency->rate, $paymentCurrency);
+
+                $request = new OrdersAuthorizeRequest($transaction->reference);
+                $request->body = '{}';
+                $request->prefer('return=representation');
+
+                try {
+                    $apiResponse = $client->execute($request);
+                } catch (\Exception $e) {
+                    throw new PaymentException($e->getMessage());
+                }
+
             } else {
                 Craft::error('FAILED VALIDATING ORDER! ' . json_encode($order->getErrors()));
                 throw new PaymentException('Failed saving authorized order!');
